@@ -1,52 +1,21 @@
 #define USE_BUILDIN_LED
-//#define USE_SERIAL_DEBUG
-//#define USE_DISPLAY_DEBUG
-#define USE_SAVEPOWER
+#define USE_DISPLAY_DEBUG
 
+// its savepower or serial debugging
+#define USE_SERIAL_DEBUG
+//#define USE_SAVEPOWER
+
+//#define USE_DETECTHAND
+#define USE_HANDLETEMP
+//#define USE_BREAKOUT_NANO // old seltmade platine with nano breakout board
+
+#include "millisTimer.h" // my timer-lib included as header because of narcoleptic support //#include <MillisTimer.h>
 #include "costumSensor.h" // CapacitiveSensor library copyed in header for modifications //#include <CapacitiveSensor.h>
-
-#include <Narcoleptic.h>
-#include "millisTimer.h" // my lib as header for narcoleptic support //#include <MillisTimer.h>
-
-
-const byte pinLed = 13;
-
-// measurement sensor pins
-const byte pinSensorSend = 4;
-const byte pinSensorReceive = 2;
-
-// measurement inputs pins
-const byte pinInKl15 = A0;
-const byte pinInBCx = A1;
-const byte pinInHandleTemp = A7;
-const byte pinInKillSwitch = 6;
-
-// 0 = mosfet sperrt, 1 = mosfet zieht gegen GND und simuliert taster
-const byte pinOutSlzPulldown = 10;
-
-// 0 = heizgriff free floating für messung, 1 = heizgriff mit GND und BCx verbunden
-const byte pinOutSetHeaterFree = 5;
-
-// init sensor pin
-CapacitiveSensor capSensor = CapacitiveSensor(pinSensorSend, pinSensorReceive);
-
-// warning, after a long long time there will be an overflow
-MillisTimer ignoreSensorCnt;
-MillisTimer isButtonPressedCnt;
-MillisTimer schedulerCnt;
-
-const int ignoreSensorTime = 950;
-const int igoreAfterKl15Off = 550;
-const int pressButtonTime = 250;
-const float clamp15Treshold = 9.5;
-
-boolean activeKillSwitch = false;
-boolean isHandleFloating = false;
-boolean isSlzPressSimActive = false;
-
+#include "pinsParameters.h"
+#include "savePower.h"
 #include "measureSensor.h"
 #include "measureInputs.h"
-#include "savePower.h"
+#include "detectHand.h"
 
 #ifdef USE_DISPLAY_DEBUG
 #include "debugDisplay.h"
@@ -56,37 +25,15 @@ boolean isSlzPressSimActive = false;
 #include "debugSerial.h"
 #endif
 
+#ifdef USE_SAVEPOWER
+#ifdef USE_SERIAL_DEBUG
+#error F("Error: savepower and serialDebug confict, because uc start to sleep before it finished the serial print")
+#endif
+#endif
+
 void setup()
 {
-  pinMode(pinInKl15, INPUT);
-
-  const byte pinInKl15 = A0;
-  const byte pinInBCx = A1;
-  const byte pinInHandleTemp = A7;
-  const byte pinInKillSwitch = 6;
-
-  pinMode(pinInKillSwitch, INPUT_PULLUP);
-
-  pinMode(pinLed, OUTPUT);
-  pinMode(pinOutSlzPulldown, OUTPUT);
-  pinMode(pinOutSetHeaterFree, OUTPUT);
-
-  // set outputs
-  digitalWrite(pinOutSlzPulldown, LOW);
-  digitalWrite(pinOutSetHeaterFree, LOW);
-
-  // init my counters
-  ignoreSensorCnt.resetTo(0);
-  isButtonPressedCnt.resetTo(0);
-
-  // set Analog Reference Voltage to 1.1 volts
-  analogReference(INTERNAL);
-
-  // disable auto calibration
-  capSensor.set_CS_AutocaL_Millis(0xFFFFFFFF);
-
-  // init Timer with main Thread
-  //timer.every(100, mainThread);
+  initPinsAndClassses();
 
 #ifdef USE_DISPLAY_DEBUG
   // init the OLED debug display
@@ -94,15 +41,13 @@ void setup()
 #endif
 
 #ifdef USE_SERIAL_DEBUG
-  // start Serial debug
-  Serial.begin(115200);
+  initSerial();
 #endif
 
 #ifdef USE_SAVEPOWER
   // which parts of the uc are not needed?
-  //initSavePower();
+  initSavePower();
 #endif
-
 }
 
 void camp15Off() {
@@ -119,24 +64,18 @@ void camp15Off() {
   // press the button, this trigger the reset function as well
   isSlzPressSimActive = true;
 
-  isButtonPressedCnt.resetTo(pressButtonTime);
+  pressButtonCnt.resetTo(pressButtonTime);
 
   // reset to ingore the sensor for a bit
-  ignoreSensorCnt.resetTo(ignoreSensorTime);
-}
-
-void camp15On() {
-  // reset to ingore the sensor
-  ignoreSensorCnt.resetTo(ignoreSensorTime);
+  ignoreSensorCnt.resetTo(ignoreAfterPushSim);
 }
 
 void checkSlzButton() {
-  // do nothing if
-  if (isButtonPressedCnt.getTime() != 0)
+  // do nothing if it is not long enough pressed
+  if (pressButtonCnt.getTime() != 0)
     return;
 
   if (isSlzPressSimActive == true) {
-
     isSlzPressSimActive = false;
 
     digitalWrite(pinOutSlzPulldown, LOW);
@@ -149,30 +88,45 @@ void mainThread() {
   measureBCx();
 
   // route killSwitch button direkt to Mosfet
-  activeKillSwitch = digitalRead(pinInKillSwitch);
+  boolean activeKillSwitch = digitalRead(pinInKillSwitch);
   digitalWrite(pinOutSlzPulldown, !activeKillSwitch);
 
   // read real klemme 15, main logic
-  if (voltageClamp15 < clamp15Treshold) {
+  isClamp15Off = (voltageClamp15 < clamp15Treshold);
+  if (isClamp15Off) {
 
-    if (isHandleFloating == false)
-      ignoreSensorCnt.resetTo(igoreAfterKl15Off);
+#ifdef USE_HANDLETEMP
+    // measure the temp once at clamp change
+    if (isClamp15Off != wasClamp15Off)
+      measureHandleTemp();
+#endif
 
-    isHandleFloating = true;
-
+    // this sets the heater free, mosfet lock
     digitalWrite(pinOutSetHeaterFree, false);
 
     measureSensor();
 
+    // this is for BCx switchOff detection, ignore sensor this timeslot
+    if (voltageBCx > 3.0) {
+      ignoreSensorCnt.resetTo(3050); // mostly for the oled screen
+      disableSensorCnt.resetTo(2050);
+    }
+
     camp15Off();
 
   } else {
-    isHandleFloating = false;
-
+    // this enables the heaters to heat, mosfets have low Ohms
     digitalWrite(pinOutSetHeaterFree, true);
 
-    camp15On();
+    // no measuring, so set duration to 0, this is just for the oled display
+    measureDuration = 0;
+
+    // reset timer to ingore the sensor and disalbe the filter
+    ignoreSensorCnt.resetTo(igoreAfterKl15Off);
+    disableSensorCnt.resetTo(igoreAfterKl15Off);
   }
+  // this boolean is used to find out changes at clamp15
+  wasClamp15Off = isClamp15Off;
 
   // reset the slz Button if necassary
   checkSlzButton();
@@ -181,26 +135,28 @@ void mainThread() {
   writeToDisplay();
 #endif
 
-#ifdef USE_SERIAL_DEBUG
-  //writeToSerial();
+#ifndef USE_SAVEPOWER
+  writeToSerial();
 #endif
 
 #ifdef USE_BUILDIN_LED
   digitalWrite(pinLed, isSlzPressSimActive);
 #endif
 
+#ifdef USE_DETECTHAND
+  checkHand();
+#endif
 }
 
 void loop()
 {
   if (schedulerCnt.getTime() == 0) {
     // reset Timer, with the next timeout
-    schedulerCnt.resetTo(100);
+    schedulerCnt.resetTo(mainIntervalTime);
 
     // do mainThread
     mainThread();
   } else {
     waitTread();
   }
-  
 }

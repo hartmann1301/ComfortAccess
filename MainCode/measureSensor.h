@@ -8,8 +8,10 @@ float valueDiff = 0;
 long measureStart = 0;
 long measureDuration = 0;
 
+int measureSamples = 50;
+
 // parameter
-const int sensorDifferenz = 150;
+const int sensorDifferenz = 400;
 
 // filter variables and function
 void calcFilter(float &value, int newValue, const int filterFaktor) {
@@ -20,16 +22,23 @@ void calcFilter(float &value, int newValue, const int filterFaktor) {
 void measureSensor() {
   // get start time, narcoleptic is not needed because the uc can not sleep while measuring
   measureStart = millis();
-  
+
   // measure
-  valueCurrent =  (float) capSensor.capacitiveSensor(50);
+  valueCurrent =  (float) capSensor.capacitiveSensor(measureSamples);
 
   // get measure duration
   measureDuration = millis() - measureStart;
 
   // store average value in first parameter
-  calcFilter(valueAverage, valueCurrent, 5);
-  calcFilter(valueSlow, valueCurrent, 30);
+  calcFilter(valueAverage, valueCurrent, 3);
+
+  // if the sensor is disabled is measures, but there will be no diff
+  if (disableSensorCnt.getTime() == 0) {
+    calcFilter(valueSlow, valueCurrent, 20);
+  } else {
+    valueSlow = valueAverage;
+  }
+
   valueDiff =  valueAverage - valueSlow;
 }
 

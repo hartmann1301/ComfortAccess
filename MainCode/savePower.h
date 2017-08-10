@@ -1,12 +1,26 @@
+#include <Narcoleptic.h>
 
 void initSavePower() {
-  // Narcoleptic.disableMillis(); Do not disable millis - we need it for our delay() function.
-  Narcoleptic.disableTimer1();
-  Narcoleptic.disableTimer2();
-  Narcoleptic.disableSerial();
-  Narcoleptic.disableADC();
+  // Do not disable millis - we need it for our delay() bzw. millis() function.
+  //Narcoleptic.disableMillis(); 
+
+  // adc is needed for voltage measuring
+  //Narcoleptic.disableADC(); 
+
+#ifndef USE_DISPLAY_DEBUG
+  // wire is only used for I2C communication with the oled display
   Narcoleptic.disableWire();
+#endif
+
+#ifndef USE_SERIAL_DEBUG
+  // serial is only used for serial communication
+  Narcoleptic.disableSerial();
+#endif
+
+  // always disalbe the following parts of the uc
   Narcoleptic.disableSPI();
+  Narcoleptic.disableTimer1();
+  Narcoleptic.disableTimer2(); 
 }
 
 
@@ -22,12 +36,7 @@ void waitTread() {
 #endif
 
 #ifdef USE_SERIAL_DEBUG
-  Serial.print(F("ms: "));
-  Serial.print((millis() + Narcoleptic.millis()), DEC);
-  Serial.print(F(" sleeped: "));
-  Serial.println(sleepTime, DEC);
-  // this delay is needed to be sure the text will be sent complete before sleeping with narcoleptic
-  delay(2);
+  void writeSleepTimes();
 #endif
 }
 

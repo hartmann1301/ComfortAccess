@@ -1,15 +1,21 @@
 //float roun
+void initSerial() {
+  // start Serial debug
+  Serial.begin(115200);
+
+  Serial.print(F("Comfort Access Start"));
+}
 
 // serial printing
 void writeToSerial() {  
+
   Serial.print((int) valueAverage);
   Serial.print("\t");
   Serial.print((int) valueDiff);
   Serial.print("\t");
 
   Serial.print("KL15:");
-  Serial.print(round(voltageClamp15), DEC);
-  Serial.print("\t");
+  Serial.println(round(voltageClamp15), DEC);
 
   /*
   graphButton.addLine(isSlzPressSimActive);  
@@ -17,6 +23,7 @@ void writeToSerial() {
   graphBCx.addLine(voltageBCx);
   */
 
+  /*
   if (ignoreSensorCnt.getTime() == 0) {
     Serial.print("SensOn");
   } else {
@@ -24,4 +31,16 @@ void writeToSerial() {
   Serial.print(ignoreSensorCnt.getTime(), DEC);
   }
   Serial.print("\n");
+  */
+}
+
+void writeSleepTimes() {
+  /*
+  Serial.print(F("ms: "));
+  Serial.print((millis() + Narcoleptic.millis()), DEC);
+  Serial.print(F(" sleeped: "));
+  Serial.println(sleepTime, DEC);
+  // this delay is needed to be sure the text will be sent complete before sleeping with narcoleptic
+  delay(2);  
+  */
 }

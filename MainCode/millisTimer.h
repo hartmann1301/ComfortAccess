@@ -1,7 +1,3 @@
-/*
-   Simple Counter class
-*/
-
 class MillisTimer {
 
   public:
@@ -12,7 +8,7 @@ class MillisTimer {
   private:
     void countDown();
 
-    int m_resetTime;
+    unsigned long m_resetTime;
     int m_cntValue;
 };
 
@@ -21,6 +17,7 @@ class MillisTimer {
 */
 //#include <MillisTimer.h>
 #include <Arduino.h>
+#include <Narcoleptic.h>
 
 MillisTimer::MillisTimer()
   : m_resetTime(0), m_cntValue(0)
@@ -51,9 +48,9 @@ void MillisTimer::countDown() {
 
   // get current time
 #ifdef USE_SAVEPOWER
-  long timeNow = Narcoleptic.millis() + millis();
+  unsigned long timeNow = Narcoleptic.millis() + millis();
 #else
-  long timeNow = millis();
+  unsigned long timeNow = millis();
 #endif
 
   // diff passed time since last check
