@@ -5,13 +5,25 @@ float valueSlow = 0;
 float valueDiff = 0;
 
 // long integers for time measurement
-long measureStart = 0;
-long measureDuration = 0;
+int measureStart = 0;
+int measureDuration = 0;
+
+const byte measureDurationSoll = 120;
+const byte measureDurationDiff = 10;
 
 int measureSamples = 50;
 
 // parameter
-const int sensorDifferenz = 400;
+const int sensorDifferenz = 2000;
+
+void initMeasureSensor() {
+  // disable auto calibration, if measure time > mainIntervalTime set timeout
+  capSensor.set_CS_AutocaL_Millis(0xFFFFFFFF);
+
+  // stop at double of the main interval time to keep the programm running
+  capSensor.set_CS_Timeout_Millis(mainIntervalTime * 2);
+}
+
 
 // filter variables and function
 void calcFilter(float &value, int newValue, const int filterFaktor) {
@@ -40,5 +52,29 @@ void measureSensor() {
   }
 
   valueDiff =  valueAverage - valueSlow;
+
+  // try to stabilize the measuring time with slow parameter
+  if (measureDuration < (measureDurationSoll - measureDurationDiff)) {
+    // measure longer to get better results
+
+    // dangerous because the valueCurrent/valueAverage will grow, so maybe increase valueSlow a bit
+    measureSamples++;
+  } else if (measureDuration > (measureDurationSoll + measureDurationDiff)) {
+    // took too long measure less
+    measureSamples--;
+  }
+
+  // try to autocalibrate if the measurement is quiet
+  if (valueDiff < sensorDifferenz / 2) {
+    // get current value
+    unsigned long tmpTotal = capSensor.getLeastTotal();
+
+    // some formula
+    if (valueCurrent > 1000)
+      tmpTotal += valueCurrent / 200;
+
+    // set modified value back
+    capSensor.setLeastTotal(tmpTotal);
+  }
 }
 

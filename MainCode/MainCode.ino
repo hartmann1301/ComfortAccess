@@ -1,21 +1,22 @@
 #define USE_BUILDIN_LED
+#define USE_PIEZO_SPEAKER
+
 #define USE_DISPLAY_DEBUG
+//#define USE_SERIAL_DEBUG
 
-// its savepower or serial debugging
-#define USE_SERIAL_DEBUG
-//#define USE_SAVEPOWER
+#define USE_SAVEPOWER
 
-//#define USE_DETECTHAND
-#define USE_HANDLETEMP
-//#define USE_BREAKOUT_NANO // old seltmade platine with nano breakout board
+//#define USE_DETECTHAND    // a fixed threshold for hands-on detection
+//#define USE_BREAKOUT_NANO // old selfmade platine with nano breakout board
 
 #include "millisTimer.h" // my timer-lib included as header because of narcoleptic support //#include <MillisTimer.h>
 #include "costumSensor.h" // CapacitiveSensor library copyed in header for modifications //#include <CapacitiveSensor.h>
-#include "pinsParameters.h"
+#include "pinsParameter.h"
 #include "savePower.h"
 #include "measureSensor.h"
 #include "measureInputs.h"
 #include "detectHand.h"
+#include "toneHelper.h"
 
 #ifdef USE_DISPLAY_DEBUG
 #include "debugDisplay.h"
@@ -34,6 +35,7 @@
 void setup()
 {
   initPinsAndClassses();
+  initMeasureSensor();
 
 #ifdef USE_DISPLAY_DEBUG
   // init the OLED debug display
@@ -83,7 +85,6 @@ void checkSlzButton() {
 }
 
 void mainThread() {
-
   measureClamp15();
   measureBCx();
 
@@ -94,12 +95,9 @@ void mainThread() {
   // read real klemme 15, main logic
   isClamp15Off = (voltageClamp15 < clamp15Treshold);
   if (isClamp15Off) {
-
-#ifdef USE_HANDLETEMP
     // measure the temp once at clamp change
     if (isClamp15Off != wasClamp15Off)
       measureHandleTemp();
-#endif
 
     // this sets the heater free, mosfet lock
     digitalWrite(pinOutSetHeaterFree, false);
@@ -131,20 +129,24 @@ void mainThread() {
   // reset the slz Button if necassary
   checkSlzButton();
 
-#ifdef USE_DISPLAY_DEBUG
-  writeToDisplay();
-#endif
-
-#ifndef USE_SAVEPOWER
-  writeToSerial();
-#endif
-
 #ifdef USE_BUILDIN_LED
   digitalWrite(pinLed, isSlzPressSimActive);
 #endif
 
+#ifdef USE_PIEZO_SPEAKER
+  checkTones(); 
+#endif
+
 #ifdef USE_DETECTHAND
   checkHand();
+#endif
+
+#ifdef USE_SERIAL_DEBUG
+  writeToSerial();
+#endif
+
+#ifdef USE_DISPLAY_DEBUG
+  writeToDisplay();
 #endif
 }
 

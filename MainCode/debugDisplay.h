@@ -83,12 +83,6 @@ void initDisplay() {
   // right line
   display.drawLine(127, 0, 127, 63, WHITE);
 
-  // test
-  display.drawLine(66, 0, 125, 0, WHITE);
-  display.drawLine(66, 63, 125, 63, WHITE);
-
-  
-
   printGraphNames();
 
   graphButton.drawScale();

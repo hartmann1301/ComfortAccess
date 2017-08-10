@@ -19,8 +19,13 @@ void initSavePower() {
 
   // always disalbe the following parts of the uc
   Narcoleptic.disableSPI();
-  Narcoleptic.disableTimer1();
+
+#ifdef USE_BUILDIN_LED
+  // timer1 is used for tone
   Narcoleptic.disableTimer2(); 
+#endif
+  Narcoleptic.disableTimer1();   
+
 }
 
 

@@ -2,13 +2,12 @@
 void initSerial() {
   // start Serial debug
   Serial.begin(115200);
-
   Serial.print(F("Comfort Access Start"));
 }
 
 // serial printing
 void writeToSerial() {  
-
+  /*
   Serial.print((int) valueAverage);
   Serial.print("\t");
   Serial.print((int) valueDiff);
@@ -17,7 +16,7 @@ void writeToSerial() {
   Serial.print("KL15:");
   Serial.println(round(voltageClamp15), DEC);
 
-  /*
+
   graphButton.addLine(isSlzPressSimActive);  
   graphKl15.addLine(voltageClamp15);
   graphBCx.addLine(voltageBCx);
@@ -32,6 +31,10 @@ void writeToSerial() {
   }
   Serial.print("\n");
   */
+  
+  #ifndef USE_SAVEPOWER
+    delay(5);
+  #endif
 }
 
 void writeSleepTimes() {

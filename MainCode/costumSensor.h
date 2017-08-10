@@ -86,7 +86,8 @@ class CapacitiveSensor
     void set_CS_AutocaL_Millis(unsigned long autoCal_millis);
     // library-accessible "private" interface
 
-    inline unsigned long getLeastTotal() { return leastTotal; };
+    inline unsigned long getLeastTotal() {return leastTotal; };
+    inline void setLeastTotal(unsigned long newValue) {leastTotal = newValue; };
         
   private:
     // variables
