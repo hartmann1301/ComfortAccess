@@ -10,9 +10,9 @@ Adafruit_SSD1306 display(OLED_RESET);
 #define LABELS_XPOS 84
 
 OledGraph graphSensor = OledGraph(0, 0, GRAPH_WIDTH, 64-27, 1500);
-OledGraph graphKl15   = OledGraph(0, 64-(2*9+7), GRAPH_WIDTH, 7, 1);
-OledGraph graphButton = OledGraph(0, 64-(9+7), GRAPH_WIDTH, 7, 1);
-OledGraph graphBCO    = OledGraph(0, 64-7, GRAPH_WIDTH, 7, 1);
+OledGraph graphButton = OledGraph(0, 64-(2*9+7), GRAPH_WIDTH, 7, 1);
+OledGraph graphKl15   = OledGraph(0, 64-(9+7), GRAPH_WIDTH, 7, 15);
+OledGraph graphBCx    = OledGraph(0, 64-7, GRAPH_WIDTH, 7, 15);
 
 void printGraphNames() {
   display.setTextSize(1);
@@ -24,13 +24,13 @@ void printGraphNames() {
   display.print("Sensor");
 
   display.setCursor(LABELS_XPOS, 64-(2*9+7));
-  display.print("Kl.15");
+  display.print("Press");
 
   display.setCursor(LABELS_XPOS, 64-(9+7));
-  display.print("Button");
+  display.print("V Kl15");
 
   display.setCursor(LABELS_XPOS, 64-7);
-  display.print("BCO Vin");
+  display.print("V BCx");
 
 }
 
@@ -47,24 +47,34 @@ void initDisplay() {
   display.setTextSize(1);
   display.setTextColor(WHITE);
 
+  display.drawLine(127, 0, 127, 63, WHITE);
+
   printGraphNames();
 
-  graphKl15.drawScale();
   graphButton.drawScale();
-  graphBCO.drawScale();
+  graphKl15.drawScale();
+  graphBCx.drawScale();
   graphSensor.drawScale();
 
   // send changes to Display
   display.display();
 }
 
-void updateDisplay() {
-  graphKl15.addLine(activeClamp15);
-  graphButton.addLine(activeKillSwitch);
-  graphBCO.addLine(0);
-  
-  graphSensor.addDots(valueSlow);
-  graphSensor.addLine(valueAverage);
+void writeToDisplay() {
+  graphButton.addLine(isSlzPressSimActive);  
+  graphKl15.addLine(voltageClamp15);
+  graphBCx.addLine(voltageBCx);
+
+  if (isHandleFloating) {
+    graphSensor.addDots(valueSlow);
+    graphSensor.addLine(valueAverage);
+  } else {
+    graphSensor.addDots(0);
+  }
+
+  // write diff value
+  display.setCursor(LABELS_XPOS, 8);
+  display.print("Sensor");
 
   // tick the whole left side one pixel left
   graphKl15.tickRect(0, 0, GRAPH_WIDTH, 64);
