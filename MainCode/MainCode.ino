@@ -1,10 +1,25 @@
 #include <Counter.h>
 #include <CapacitiveSensor.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define OLED_RESET 4
+Adafruit_SSD1306 display(OLED_RESET);
 
 const byte pinLed = 13;
+
 const byte pinSensorSend = 2;
-const byte pinSensorReceive = 4;
-const byte pinKillSwitchIn = 14;  // 14 <=> A0
+const byte pinSensorReceive = 3;
+
+const byte pinInKillSwitch = 11;
+const byte pinOutSLZpullDown = 10;
+
+const byte pinOutDisplayGnd = A2
+const byte pinOutDisplayVcc = A3
+//const byte pinOutDisplaySda = A4
+//const byte pinOutDisplayScl = A5
+
 
 CapacitiveSensor capSensor = CapacitiveSensor(pinSensorReceive, pinSensorSend);
 
@@ -17,8 +32,8 @@ void calcFilter(float &value, int newValue, const int filterFaktor) {
 const int sensorThreshold = 15;
 const int sensorDifferenz = 20;
 
-const int timeoutKl15Off = 1000;
-const int timeoutHandlebarLock = 2000;
+const int timeoutKl15Off = 100;
+const int timeoutHandlebarLock = 1500;
 
 // globals
 float valueCurrent = 0;
@@ -26,6 +41,7 @@ float valueAverage = 0;
 float valueSlow = 0;
 
 Counter killSwitchCnt;
+Counter ignoreSensorCnt;
 
 long measureStart = 0;
 long measureDuration = 0;
@@ -37,10 +53,33 @@ byte statusLock = HANDLEBAR_UNLOCKED;
 
 void setup()
 {
-  Serial.begin(9600);
+
 
   pinMode(pinLed, OUTPUT);  
-  pinMode(pinKillSwitchIn, INPUT_PULLUP);
+
+  pinMode(pinInKillSwitch, INPUT_PULLUP);
+
+  // set display pins
+  pinMode(pinOutDisplayGnd, OUTPUT);
+  pinMode(pinOutDisplayVcc, OUTPUT);
+  digitalWrite(pinOutDisplayGnd, LOW);
+  digitalWrite(pinOutDisplayVcc, HIGH);
+
+  pinMode(pinOutSLZpullDown, OUTPUT);  
+  digitalWrite(pinOutSLZpullDown, HIGH);  
+
+  Serial.begin(9600);
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+
+  // horizontal line under textblock
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println("Cap. Sensor Test");
+  display.drawLine(79, 35, 127, 35, WHITE);
+  display.drawLine(1, 35, 48, 35, WHITE);
+  display.display();
 }
 
 
@@ -61,7 +100,7 @@ void loop()
     
   } else {
 
-    if (!digitalRead(pinKillSwitchIn)) {
+    if (!digitalRead(pinInKillSwitch)) {
       killSwitchCnt.count();
 
     } else {
@@ -77,6 +116,11 @@ void loop()
     // check if kl15 switch on is detected
     if (valueAverage > valueSlow + sensorDifferenz) {   // diff of average and slow value
       //if (valueAverage > sensorThreshold) {   // fixed threshold value
+
+      digitalWrite(pinOutSLZpullDown, LOW);
+      delay(100);
+      digitalWrite(pinOutSLZpullDown, HIGH);
+      
       statusKl15 = KL15_ON;
     }
 
