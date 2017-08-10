@@ -1,173 +1,100 @@
-#include <Counter.h>
+#include <MillisCounter.h>
 #include <CapacitiveSensor.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 
-#define OLED_RESET 4
-Adafruit_SSD1306 display(OLED_RESET);
-
+// input and output pins
 const byte pinLed = 13;
+const byte pinSensorSend = 2; // pinSensorSend = 2
+const byte pinSensorReceive = 4; // pinSensorReceive = 4
+const byte pinInKl15 = 9; //pinInKl15 = 10
+const byte pinInKillSwitch = 6; //pinInKillSwitch = 11
+const byte pinOutSlzRelay = 10; //pinOutSlzRelay = 12
+const byte pinOutHeaterRelay = 5; //pinOutHeaterRelay = 9
 
-const byte pinSensorSend = 2;
-const byte pinSensorReceive = 3;
+// init main Timer
+//Timer timer;
 
-const byte pinInKillSwitch = 11;
-const byte pinOutSLZpullDown = 10;
+// warning, after a long long time there will be an overflow
+MillisCounter ignoreSensorCnt;
+const int ignoreSensorTime = 500;
 
-const byte pinOutDisplayGnd = A2
-const byte pinOutDisplayVcc = A3
-//const byte pinOutDisplaySda = A4
-//const byte pinOutDisplayScl = A5
+boolean activeKillSwitch;
+boolean activeClamp15;
 
-
-CapacitiveSensor capSensor = CapacitiveSensor(pinSensorReceive, pinSensorSend);
-
-// filter variables and function
-void calcFilter(float &value, int newValue, const int filterFaktor) {
-  value = ((value * filterFaktor) + newValue) / (filterFaktor + 1.0);
-}
-
-// parameter
-const int sensorThreshold = 15;
-const int sensorDifferenz = 20;
-
-const int timeoutKl15Off = 100;
-const int timeoutHandlebarLock = 1500;
-
-// globals
-float valueCurrent = 0;
-float valueAverage = 0;
-float valueSlow = 0;
-
-Counter killSwitchCnt;
-Counter ignoreSensorCnt;
-
-long measureStart = 0;
-long measureDuration = 0;
-
-enum { KL15_OFF, KL15_ON};
-enum { HANDLEBAR_UNLOCKED, HANDLEBAR_LOCKED};
-byte statusKl15 = KL15_OFF;
-byte statusLock = HANDLEBAR_UNLOCKED;
+#include "measureSensor.h"
+#include "debugSerial.h"
+#include "debugDisplay.h"
 
 void setup()
 {
-
-
-  pinMode(pinLed, OUTPUT);  
-
+  pinMode(pinLed, OUTPUT);
+  pinMode(pinInKl15, INPUT);
   pinMode(pinInKillSwitch, INPUT_PULLUP);
+  pinMode(pinOutSlzRelay, OUTPUT);
+  pinMode(pinOutHeaterRelay, OUTPUT);
 
-  // set display pins
-  pinMode(pinOutDisplayGnd, OUTPUT);
-  pinMode(pinOutDisplayVcc, OUTPUT);
-  digitalWrite(pinOutDisplayGnd, LOW);
-  digitalWrite(pinOutDisplayVcc, HIGH);
+  digitalWrite(pinOutSlzRelay, LOW);
+  digitalWrite(pinOutHeaterRelay, LOW);
 
-  pinMode(pinOutSLZpullDown, OUTPUT);  
-  digitalWrite(pinOutSLZpullDown, HIGH);  
+  // init the OLED debug display
+  initDisplay();
 
+  // disable auto calibration
+  capSensor.set_CS_AutocaL_Millis(0xFFFFFFFF);
+  
   Serial.begin(9600);
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  display.clearDisplay();
-
-  // horizontal line under textblock
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0, 0);
-  display.println("Cap. Sensor Test");
-  display.drawLine(79, 35, 127, 35, WHITE);
-  display.drawLine(1, 35, 48, 35, WHITE);
-  display.display();
 }
 
+void camp15Off() {
+  // count
+  ignoreSensorCnt.countDown();
+
+  if (ignoreSensorCnt.getValue() != 0)
+    return;
+
+  // check if kl15 switch on is detected
+  if (valueDiff < sensorDifferenz)
+    return;
+
+  // simulate short pressing for switching On
+  digitalWrite(pinOutSlzRelay, HIGH);
+  Serial.println("press");
+
+  // set onBoard LED
+  digitalWrite(pinLed, true);
+  delay(200);
+  digitalWrite(pinLed, false);
+
+  digitalWrite(pinOutSlzRelay, LOW);
+  Serial.println("release");
+
+  // reset to ingore the sensor for a bit
+  ignoreSensorCnt.resetTo(ignoreSensorTime);
+}
+
+void camp15On() {
+  // reset to ingore the sensor
+  ignoreSensorCnt.resetTo(ignoreSensorTime);
+}
 
 void loop()
 {
-  // do capa measurement
-  measureStart = millis();
-  valueCurrent =  (float) capSensor.capacitiveSensor(50);
-  measureDuration = millis() - measureStart;
+  doMeasurement();
 
-  // store average value in first parameter
-  calcFilter(valueAverage, valueCurrent, 10);
-  calcFilter(valueSlow, valueCurrent, 50);
+  // route killSwitch button direkt to Relay
+  activeKillSwitch = digitalRead(pinInKillSwitch);
+  digitalWrite(pinOutSlzRelay, !activeKillSwitch);
 
-  // count time killSwitch is pressed
-  if (statusLock == HANDLEBAR_LOCKED) {
-    killSwitchCnt.reset();
-    
+  // if kl15 on, enable heater relay
+  activeClamp15 = digitalRead(pinInKl15);
+  digitalWrite(pinOutHeaterRelay, activeClamp15);
+
+  // read real klemme 15, main logic
+  if (activeClamp15 == false) {
+    camp15Off();
   } else {
-
-    if (!digitalRead(pinInKillSwitch)) {
-      killSwitchCnt.count();
-
-    } else {
-      killSwitchCnt.reset();
-          
-    }
+    camp15On();
   }
-
-  // main logic
-  if (statusKl15 == KL15_OFF) {
-    // kl15 is Off
-
-    // check if kl15 switch on is detected
-    if (valueAverage > valueSlow + sensorDifferenz) {   // diff of average and slow value
-      //if (valueAverage > sensorThreshold) {   // fixed threshold value
-
-      digitalWrite(pinOutSLZpullDown, LOW);
-      delay(100);
-      digitalWrite(pinOutSLZpullDown, HIGH);
-      
-      statusKl15 = KL15_ON;
-    }
-
-    // check if handlebar needs to be locked
-    if (killSwitchCnt.getValue() > timeoutHandlebarLock) {
-      statusLock = HANDLEBAR_LOCKED;
-    }
-
-  } else {
-    // kl15 is On
-
-    // when kl15 is on handlebar is unlocked
-    statusLock = HANDLEBAR_UNLOCKED;
-
-    // check if kl15 switch off is detected
-    if (killSwitchCnt.getValue() > timeoutKl15Off) {
-      statusKl15 = KL15_OFF;
-    }
-
-  }
-  //if (statusKl15 == KL15_OFF) {
-  digitalWrite(pinLed, statusKl15);
-
-  // print to Serial
-  Serial.print((int) valueAverage);
-  Serial.print("\t");
-
-  Serial.print((int) valueSlow);
-  Serial.print("\t");
-
-  if (statusKl15 == KL15_OFF) {
-    Serial.print("Kl15_off");
-  } else {
-    Serial.print("Kl15_on ");
-  }
-  Serial.print("\t");
-
-
-  if (statusLock == HANDLEBAR_UNLOCKED) {
-    Serial.print("UNLOCKED");
-  } else {
-    Serial.print("LOCKED  ");
-  }
-  Serial.print("\t");
-
-  Serial.print(killSwitchCnt.getValue());
-  Serial.print("\n");
-
-  delay(10);
+  
+  printSerial();
+  updateDisplay();
 }
