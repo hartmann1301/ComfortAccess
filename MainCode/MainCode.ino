@@ -1,14 +1,15 @@
-#include <MillisCounter.h>
-#include <CapacitiveSensor.h>
-#include <Timer.h>
-
 #define USE_BUILDIN_LED
-#define USE_SERIAL_DEBUG
-#define USE_DISPLAY_DEBUG
+//#define USE_SERIAL_DEBUG
+//#define USE_DISPLAY_DEBUG
+#define USE_SAVEPOWER
 
-#ifdef USE_BUILDIN_LED
+#include "costumSensor.h" // CapacitiveSensor library copyed in header for modifications //#include <CapacitiveSensor.h>
+
+#include <Narcoleptic.h>
+#include "millisTimer.h" // my lib as header for narcoleptic support //#include <MillisTimer.h>
+
+
 const byte pinLed = 13;
-#endif
 
 // measurement sensor pins
 const byte pinSensorSend = 4;
@@ -29,13 +30,10 @@ const byte pinOutSetHeaterFree = 5;
 // init sensor pin
 CapacitiveSensor capSensor = CapacitiveSensor(pinSensorSend, pinSensorReceive);
 
-// init main Timer
-Timer timer;
-
 // warning, after a long long time there will be an overflow
-MillisCounter ignoreSensorCnt;
-MillisCounter isButtonPressedCnt;
-MillisCounter mainTimer;
+MillisTimer ignoreSensorCnt;
+MillisTimer isButtonPressedCnt;
+MillisTimer schedulerCnt;
 
 const int ignoreSensorTime = 950;
 const int igoreAfterKl15Off = 550;
@@ -48,6 +46,7 @@ boolean isSlzPressSimActive = false;
 
 #include "measureSensor.h"
 #include "measureInputs.h"
+#include "savePower.h"
 
 #ifdef USE_DISPLAY_DEBUG
 #include "debugDisplay.h"
@@ -96,15 +95,18 @@ void setup()
 
 #ifdef USE_SERIAL_DEBUG
   // start Serial debug
-  Serial.begin(9600);
+  Serial.begin(115200);
 #endif
+
+#ifdef USE_SAVEPOWER
+  // which parts of the uc are not needed?
+  //initSavePower();
+#endif
+
 }
 
 void camp15Off() {
-  // count  down
-  ignoreSensorCnt.countDown();
-
-  if (ignoreSensorCnt.getValue() != 0)
+  if (ignoreSensorCnt.getTime() != 0)
     return;
 
   // check if hand-on is detected
@@ -113,7 +115,6 @@ void camp15Off() {
 
   // simulate pressing for switching On
   digitalWrite(pinOutSlzPulldown, HIGH);
-  Serial.println("press");
 
   // press the button, this trigger the reset function as well
   isSlzPressSimActive = true;
@@ -130,15 +131,12 @@ void camp15On() {
 }
 
 void checkSlzButton() {
-  // update internal counter
-  isButtonPressedCnt.countDown();
-
-  // do nothing if 
-  if (isButtonPressedCnt.getValue() != 0)
+  // do nothing if
+  if (isButtonPressedCnt.getTime() != 0)
     return;
 
   if (isSlzPressSimActive == true) {
-    Serial.println("release Slz Button");
+
     isSlzPressSimActive = false;
 
     digitalWrite(pinOutSlzPulldown, LOW);
@@ -184,7 +182,7 @@ void mainThread() {
 #endif
 
 #ifdef USE_SERIAL_DEBUG
-  writeToSerial();
+  //writeToSerial();
 #endif
 
 #ifdef USE_BUILDIN_LED
@@ -195,14 +193,14 @@ void mainThread() {
 
 void loop()
 {
-  // check the current time und count
-  mainTimer.countDown();
-
-  if (mainTimer.getValue() == 0) {
-    // reset Timer with the current Timer
-    mainTimer.resetTo(100);
+  if (schedulerCnt.getTime() == 0) {
+    // reset Timer, with the next timeout
+    schedulerCnt.resetTo(100);
 
     // do mainThread
     mainThread();
+  } else {
+    waitTread();
   }
+  
 }

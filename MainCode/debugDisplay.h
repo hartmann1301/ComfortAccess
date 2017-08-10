@@ -8,8 +8,9 @@ Adafruit_SSD1306 display(OLED_RESET);
 
 #define GRAPH_WIDTH 64
 #define LABELS_XPOS 84
+#define LABELS_XUP  70
 
-OledGraph graphSensor = OledGraph(0, 0, GRAPH_WIDTH, 64-27, 1500);
+OledGraph graphSensor = OledGraph(0, 0, GRAPH_WIDTH, 64-27, 8000);
 OledGraph graphButton = OledGraph(0, 64-(2*9+7), GRAPH_WIDTH, 7, 1);
 OledGraph graphKl15   = OledGraph(0, 64-(9+7), GRAPH_WIDTH, 7, 15);
 OledGraph graphBCx    = OledGraph(0, 64-7, GRAPH_WIDTH, 7, 15);
@@ -18,10 +19,12 @@ void printGraphNames() {
   display.setTextSize(1);
   display.setTextColor(WHITE);
 
-  display.setCursor(LABELS_XPOS, 0);
-  display.print("Griff");
-  display.setCursor(LABELS_XPOS, 8);
+  display.setCursor(LABELS_XUP, 0);
   display.print("Sensor");
+  display.setCursor(LABELS_XUP, 8);
+  display.print("Tm:");
+  display.setCursor(LABELS_XUP, 16);
+  display.print("lT:");
 
   display.setCursor(LABELS_XPOS, 64-(2*9+7));
   display.print("Press");
@@ -72,9 +75,17 @@ void writeToDisplay() {
     graphSensor.addDots(0);
   }
 
-  // write diff value
-  display.setCursor(LABELS_XPOS, 8);
-  display.print("Sensor");
+  // clear space for diff value
+  display.fillRect(LABELS_XUP + 20, 8, 30, 8, BLACK);
+  // write measureDuration value  
+  display.setCursor(LABELS_XUP + 20, 8);
+  display.print(measureDuration);
+
+  // clear space for diff value
+  display.fillRect(LABELS_XUP + 20, 16, 30, 8, BLACK);
+  // write measureDuration value  
+  display.setCursor(LABELS_XUP + 20, 16);
+  display.print(capSensor.getLeastTotal());
 
   // tick the whole left side one pixel left
   graphKl15.tickRect(0, 0, GRAPH_WIDTH, 64);

@@ -17,11 +17,11 @@ void writeToSerial() {
   graphBCx.addLine(voltageBCx);
   */
 
-  if (ignoreSensorCnt.getValue() == 0) {
+  if (ignoreSensorCnt.getTime() == 0) {
     Serial.print("SensOn");
   } else {
     Serial.print("Ingore:");
-  Serial.print(ignoreSensorCnt.getValue(), DEC);
+  Serial.print(ignoreSensorCnt.getTime(), DEC);
   }
   Serial.print("\n");
 }

@@ -9,7 +9,7 @@ long measureStart = 0;
 long measureDuration = 0;
 
 // parameter
-const int sensorDifferenz = 50;
+const int sensorDifferenz = 150;
 
 // filter variables and function
 void calcFilter(float &value, int newValue, const int filterFaktor) {
@@ -18,18 +18,18 @@ void calcFilter(float &value, int newValue, const int filterFaktor) {
 
 // do capa measurement and calculations
 void measureSensor() {
-  // get start time
+  // get start time, narcoleptic is not needed because the uc can not sleep while measuring
   measureStart = millis();
-
+  
   // measure
-  valueCurrent =  (float) capSensor.capacitiveSensor(10);
+  valueCurrent =  (float) capSensor.capacitiveSensor(50);
 
   // get measure duration
   measureDuration = millis() - measureStart;
 
   // store average value in first parameter
   calcFilter(valueAverage, valueCurrent, 5);
-  calcFilter(valueSlow, valueCurrent, 50);
+  calcFilter(valueSlow, valueCurrent, 30);
   valueDiff =  valueAverage - valueSlow;
 }
 
