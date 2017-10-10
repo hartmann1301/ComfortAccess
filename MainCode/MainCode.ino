@@ -4,21 +4,22 @@
 #define USE_DISPLAY_DEBUG
 //#define USE_SERIAL_DEBUG
 
-#define USE_SAVEPOWER
+//#define USE_SAVEPOWER //problem with save power?????
 
-//#define USE_DETECTHAND    // a fixed threshold for hands-on detection
-//#define USE_BREAKOUT_NANO // old selfmade platine with nano breakout board
+#define K21
+//#define K48
 
-#include "millisTimer.h" // my timer-lib included as header because of narcoleptic support //#include <MillisTimer.h>
-#include "costumSensor.h" // CapacitiveSensor library copyed in header for modifications //#include <CapacitiveSensor.h>
+#include <MillisTimer.h>
+#include <CapacitiveSensor.h>
+
 #include "pinsParameter.h"
 #include "savePower.h"
 #include "measureSensor.h"
 #include "measureInputs.h"
-#include "detectHand.h"
 #include "toneHelper.h"
 
 #ifdef USE_DISPLAY_DEBUG
+#include "startScreens.h"
 #include "debugDisplay.h"
 #endif
 
@@ -60,16 +61,19 @@ void camp15Off() {
   if (valueDiff < sensorDifferenz)
     return;
 
+  setModeAwake();
+
   // simulate pressing for switching On
   digitalWrite(pinOutSlzPulldown, HIGH);
 
   // press the button, this trigger the reset function as well
   isSlzPressSimActive = true;
+  pressSlzCounter++;
 
   pressButtonCnt.resetTo(pressButtonTime);
 
   // reset to ingore the sensor for a bit
-  ignoreSensorCnt.resetTo(ignoreAfterPushSim);
+  ignoreSensorCnt.raiseTo(ignoreAfterPushSim);
 }
 
 void checkSlzButton() {
@@ -95,34 +99,54 @@ void mainThread() {
   // read real klemme 15, main logic
   isClamp15Off = (voltageClamp15 < clamp15Treshold);
   if (isClamp15Off) {
-    // measure the temp once at clamp change
-    if (isClamp15Off != wasClamp15Off)
-      measureHandleTemp();
+    
+    // first time afte clamp switch on
+    if (isClamp15Off != wasClamp15Off) {
+      kl15OffOffset = Narcoleptic.millis() + millis();
 
-    // this sets the heater free, mosfet lock
+      // measure the temp once at clamp change
+      //measureHandleTemp();
+      
+      // we woke up by someone else, other ecus are awake
+      setModeAwake();
+
+      // this sets the heater free, mosfet lock
+      digitalWrite(pinOutSetHeaterFree, false);
+
+      /* wait for the first time, because V-BCx could need time to discarge
+      while (voltageBCx > 4.0) {
+        measureBCx();
+      }
+      */
+
+      //delay(1);
+    }
+
+    // this should not be necassary, just to be 100% sure the mosfets lock while measuring
     digitalWrite(pinOutSetHeaterFree, false);
 
     measureSensor();
 
-    // this is for BCx switchOff detection, ignore sensor this timeslot
-    if (voltageBCx > 3.0) {
-      ignoreSensorCnt.resetTo(3050); // mostly for the oled screen
-      disableSensorCnt.resetTo(2050);
-    }
+    // this can change the interval time
+    checkBCxSwitchOff();
 
     camp15Off();
 
+    kl15OffCounter = (Narcoleptic.millis() + millis()) - kl15OffOffset ;
+
   } else {
     // this enables the heaters to heat, mosfets have low Ohms
-    digitalWrite(pinOutSetHeaterFree, true);
+    //digitalWrite(pinOutSetHeaterFree, true); !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! no heating
 
     // no measuring, so set duration to 0, this is just for the oled display
     measureDuration = 0;
+    kl15OffCounter = 0;
 
     // reset timer to ingore the sensor and disalbe the filter
-    ignoreSensorCnt.resetTo(igoreAfterKl15Off);
-    disableSensorCnt.resetTo(igoreAfterKl15Off);
+    ignoreSensorCnt.raiseTo(igoreAfterKl15Off);
+
   }
+  
   // this boolean is used to find out changes at clamp15
   wasClamp15Off = isClamp15Off;
 
@@ -134,7 +158,7 @@ void mainThread() {
 #endif
 
 #ifdef USE_PIEZO_SPEAKER
-  checkTones(); 
+  checkTones();
 #endif
 
 #ifdef USE_DETECTHAND

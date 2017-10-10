@@ -4,9 +4,9 @@ const byte pinLed = 13;
 #ifdef USE_BREAKOUT_NANO
 const byte pinSensorSend = 4;
 const byte pinSensorReceive = 2;
-#else 
+#else
 const byte pinSensorSend = 2;
-const byte pinSensorReceive = 4;
+const byte pinSensorReceive = 7;
 #endif
 
 // measurement inputs pins
@@ -32,8 +32,29 @@ MillisTimer schedulerCnt;
 MillisTimer pressButtonCnt;
 MillisTimer ignoreSensorCnt;
 MillisTimer disableSensorCnt;
+MillisTimer resetDetectionCnt;
 
-const int mainIntervalTime = 200;
+const int mainIntervalTimeAwake = 150;
+const int mainIntervalTimeSleep = 250;
+int mainIntervalTime = mainIntervalTimeAwake;
+
+enum {AWAKE, SLEEP};
+byte measureMode = AWAKE;
+
+void setModeAwake() {
+  mainIntervalTime = mainIntervalTimeAwake;
+
+  // only for the disp
+  measureMode = AWAKE;
+}
+
+void setModeSleep() {
+  mainIntervalTime = mainIntervalTimeSleep;
+
+  // only for the disp
+  measureMode = SLEEP;
+}
+
 const int ignoreAfterPushSim = 850;
 const int igoreAfterKl15Off = 2050;
 const int pressButtonTime = 350;
@@ -42,21 +63,22 @@ const float clamp15Treshold = 9.5;
 boolean isClamp15Off;
 boolean wasClamp15Off = false;
 boolean isSlzPressSimActive = false;
+boolean errorFlag = true;
+
+int pressSlzCounter = 0;
+long kl15OffCounter = 0;
+long kl15OffOffset = 0;
 
 void initPinsAndClassses() {
   pinMode(pinInKl15, INPUT);
   pinMode(pinInBCx, INPUT);
   pinMode(pinInKillSwitch, INPUT_PULLUP);
 
-  pinMode(pinInHandleTemp, INPUT);  
-  
-#ifdef USE_HANDLETEMP
+  pinMode(pinInHandleTemp, INPUT);
+
   // for measuring, this pin should be an output with 5 volts
   pinMode(pinMeasureHandleVcc, OUTPUT);
   digitalWrite(pinMeasureHandleVcc, LOW);
-#else
-  pinMode(pinMeasureHandleVcc, INPUT);
-#endif
 
   pinMode(pinLed, OUTPUT);
   pinMode(pinOutSlzPulldown, OUTPUT);
@@ -64,14 +86,13 @@ void initPinsAndClassses() {
 
   // set outputs
   digitalWrite(pinOutSlzPulldown, LOW);
-  digitalWrite(pinOutSetHeaterFree, HIGH);
-  
+  digitalWrite(pinOutSetHeaterFree, LOW);
+
   // init my counters
-  startUpCnt.resetTo(1000);  
+  startUpCnt.resetTo(1000);
   schedulerCnt.resetTo(0);
   pressButtonCnt.resetTo(0);
-  ignoreSensorCnt.resetTo(0); 
-  disableSensorCnt.resetTo(0);
+  ignoreSensorCnt.resetTo(1000);
 
   // set Analog Reference Voltage to 1.1 volts
   analogReference(INTERNAL);

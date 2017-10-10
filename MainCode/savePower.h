@@ -2,10 +2,10 @@
 
 void initSavePower() {
   // Do not disable millis - we need it for our delay() bzw. millis() function.
-  //Narcoleptic.disableMillis(); 
+  //Narcoleptic.disableMillis();
 
   // adc is needed for voltage measuring
-  //Narcoleptic.disableADC(); 
+  //Narcoleptic.disableADC();
 
 #ifndef USE_DISPLAY_DEBUG
   // wire is only used for I2C communication with the oled display
@@ -20,14 +20,12 @@ void initSavePower() {
   // always disalbe the following parts of the uc
   Narcoleptic.disableSPI();
 
-#ifdef USE_BUILDIN_LED
+#ifndef USE_PIEZO_SPEAKER
   // timer1 is used for tone
-  Narcoleptic.disableTimer2(); 
+  Narcoleptic.disableTimer2();
+  Narcoleptic.disableTimer1();
 #endif
-  Narcoleptic.disableTimer1();   
-
 }
-
 
 void waitTread() {
 
@@ -39,6 +37,7 @@ void waitTread() {
 #else
   delay(sleepTime);
 #endif
+
 
 #ifdef USE_SERIAL_DEBUG
   void writeSleepTimes();

@@ -94,15 +94,15 @@ void checkStartUp() {
     return;
 
   if (tmpTime > mainIntervalTime*4) {
-    tone(pinSpeakerOut, 400, mainIntervalTime);    
+    tone(pinSpeakerOut, 400);    
   } else  if (tmpTime > mainIntervalTime*3) {
-    tone(pinSpeakerOut, 450, mainIntervalTime);   
+    tone(pinSpeakerOut, 450);   
   } else  if (tmpTime > mainIntervalTime*2) {
-    tone(pinSpeakerOut, 500, mainIntervalTime);   
+    tone(pinSpeakerOut, 500);   
   } else  if (tmpTime > mainIntervalTime*1) {
-    tone(pinSpeakerOut, 400, mainIntervalTime);   
+    tone(pinSpeakerOut, 400);   
   } else  if (tmpTime > mainIntervalTime*0) {
-    tone(pinSpeakerOut, 300, mainIntervalTime);   
+    tone(pinSpeakerOut, 300);   
   }
 }
 
@@ -112,16 +112,16 @@ void checkPressButton() {
     return;
 
   if (tmpTime > mainIntervalTime*2) {
-    tone(pinSpeakerOut, 200, mainIntervalTime);   
+    tone(pinSpeakerOut, 200);   
   } else  if (tmpTime > mainIntervalTime*1) {
-    tone(pinSpeakerOut, 250, mainIntervalTime);   
+    tone(pinSpeakerOut, 250);   
   } else  if (tmpTime > mainIntervalTime*0) {
-    tone(pinSpeakerOut, 300, mainIntervalTime);   
+    tone(pinSpeakerOut, 300);   
   }
 }
 
 void checkTones() {
-  // diable output
+  // always disable the output first
   noTone(pinSpeakerOut);
   
   // check timers to see if a tone should be played
